@@ -42,9 +42,9 @@ See following example.
 
 Special Tanks
 ----------------------------------
-### [ Command-t ]( https://github.com/wincent/Command-T )
 
+#### [ Command-t ]( https://github.com/wincent/Command-T )
 User interface and architecture is greately inspired and bollwed from command-t which is also derived from inspired by LustiExplorer.
 
-### [ vimilicious ]( https://github.com/remi/vimilicious )
+#### [ vimilicious ]( https://github.com/remi/vimilicious )
 
