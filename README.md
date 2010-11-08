@@ -44,7 +44,7 @@ See following example.
         cr[:] = None
         vim.insert(cr.start,new_text)
 
-Special Tanks
+Special Thanks
 ----------------------------------
 
 #### [ Command-t ]( https://github.com/wincent/Command-T )
