@@ -4,6 +4,12 @@ import sys
 import re
 import os
 
+__all__ = (
+    'vim', 
+    'AnythingSource',
+    'anything'
+)
+
 # alias
 vim.cmd = vim.command
 vim.normal = lambda cmd: vim.command("normal! " + cmd.replace('<','\<'))
@@ -83,6 +89,7 @@ class Anything(object):
             vim.current.window.height = min(len(lis), self.win_height_max)
             
         def finish(self):
+            self.src_page_idx = 0
             self.restore()
 
         def save(self):
@@ -144,63 +151,71 @@ class Anything(object):
 
             fmt = "nnoremap <silent> <buffer> %s :python " + self.name + ".special_key('%s')<CR>"
             special_keys = { 
-                    'CursorHead'         : '<C-a>',
-                    'CursorEnd'          : '<C-e>',
-                    'Backspace'          : ['<C-h>','<BS>'],
-                    'AcceptSelection'    : '<CR>',
-                    'Cancel'             : ['<C-g>','<C-c>', '<Esc>','<D-j>'],
-                    'NextLine'           : '<C-n>',
-                    'PreviousLine'       : '<C-p>',
-                    'SelectAction'       : '<Tab>',
-                    'ClearLine'          : ['<C-u>','<D-u>'],
-                    'DeleteBackwordWord' : '<C-w>',
-                    'WinsizeIncrease'    : '<C-o>',
-                    'WinsizeDecrease'    : '<C-[>',
+                    'CursorHead'           : '<C-a>',
+                    'CursorEnd'            : '<C-e>',
+                    'Backspace'            : ['<C-h>','<BS>'],
+                    'AcceptSelection'      : '<CR>',
+                    'Cancel'               : ['<C-g>','<C-c>', '<Esc>','<D-j>'],
+                    'NextLine'             : '<C-n>',
+                    'PreviousLine'         : '<C-p>',
+                    # 'SelectAction'       : '<Tab>',
+                    'ClearLine'            : ['<C-u>','<D-u>'],
+                    'DeleteBackwordWord'   : '<C-w>',
+                    'WinsizeIncrease'      : '<C-o>',
+                    'WinsizeDecrease'      : '<C-[>',
+                    # 'ShowHelp'           : '<f1>',
+                    'SwitchSourceNext'     : '<Tab>',
+                    'SwitchSourcePrevious' : '<S-Tab>',
+                    'SwitchSource_1'       : '<f1>',
+                    'SwitchSource_2'       : '<f2>',
+                    'SwitchSource_3'       : '<f3>',
                     }
 
-            cmd_list = []
+            vim_cmd_list = []
             for func, key in special_keys.items():
                 if type(key) == list:
-                    cmd_list.extend( [ fmt % (k, func) for k in key] )
+                    vim_cmd_list.extend( [ fmt % (k, func) for k in key] )
                 else:
-                    cmd_list.append( fmt % (key, func) )
-            for cmd in cmd_list: vim.command(cmd)
+                    vim_cmd_list.append( fmt % (key, func) )
+            for cmd in vim_cmd_list: vim.command(cmd)
 
 
     #########################
     # Main Controller
     #########################
     current_input = ""
-    def __init__(self, name, source, source_b=None):
+    def __init__(self, name):
+            # , source, source_b=None):
         super(Anything,self).__init__()
         self.name = name
-        self.source = source
-        self.source_b = source_b
+        self.src_page_idx = 0
 
-    def start(self,mode='n'):
+    def start(self, src, ac_src_dict=None, mode='n'):
+        self.ac_src_dict = ac_src_dict
         self.mode = mode
+        self.source = src
 
-        self.initial_range  = vim.current.range
-        self.initial_window = vim.current.window
-        self.initial_buffer = vim.current.buffer
+        self.init()
 
         self.window   = self.Window()
         self.echoline = self.Echoline()
         self.keybind  = self.Keybind(self.name)
 
+        self.init_interactive()
+
+    def init(self):
+        self.range  = vim.current.range
+        self.initial_window = vim.current.window
+        self.initial_buffer = vim.current.buffer
+
+    def init_interactive(self):
         if self.source.volatile:
             self.source.candidate = self.source.prepare_candidate()
         if hasattr(self.source, "candidate_" + self.mode ):
             self.source.candidate = getattr(self.source, "candidate_" + self.mode)
 
-        self.org_src = self.source
-        if hasattr(self, 'source_b'): self.src_b = self.source_b
-
         self.window.update(self.source.view())
         self.refresh_screen()
-
-    def init(self):
-        self.initial_range = vim.current.range
 
     def run(self, command):
         self.init()
@@ -227,7 +242,7 @@ class Anything(object):
 
         candidate = [ cmd for cmd, doc in source ]
         search = ".*%s.*" % '.*'.join(ptns.split())
-        result = [ cmd_name for cmd_name in candidate if re.match(search, cmd_name)]
+        result = [ cmd_name for cmd_name in candidate if re.match(search, cmd_name, re.I)]
 
         if not len(result) and len(ptns.split()) == 1:
             abbr_list = []
@@ -240,7 +255,7 @@ class Anything(object):
                 except IndexError:
                     pass
             # return abbr_list
-            result = [ cmd for abbr, cmd in abbr_list if re.match(abbr,ptns.split()[0]) ]
+            result = [ cmd for abbr, cmd in abbr_list if re.match(abbr, ptns.split()[0], re.I) ]
         return [ (cmd, doc) for cmd, doc in source if cmd in result ]
 
     def normal_key(self,key):
@@ -260,8 +275,6 @@ class Anything(object):
         method()
 
     def do_Cancel(self):
-        self.source = self.org_src
-        if hasattr(self, 'source_b'): self.source_b = self.src_b
         self.finish()
 
     def do_AcceptSelection(self):
@@ -281,32 +294,53 @@ class Anything(object):
         # except Exception, e:
             # self.echoline.print_result(e)
         finally:
+            self.src_page_idx = 0
             self.echoline.print_result(let)
-            self.source = self.org_src
-            if hasattr(self, 'source_b'): self.source_b = self.src_b
 
     def refresh_screen(self):
         self.echoline.update(self.source.name + " >> ", self.current_input)
 
-    def do_ClearLine(self):
-        self.current_input = ""
+    def redraw(self):
         self.update_candidate()
         self.refresh_screen()
 
+    def do_ClearLine(self):
+        self.current_input = ""
+        self.redraw()
+
     def do_CursorHead(self): pass
     def do_CursorEnd(self): pass
+
+    def do_ShowHelp(self): pass
+
+    def do_SwitchSource(self, src_num):
+        self.source = self.ac_src_dict[src_num]
+        self.current_input = ""
+        self.init()
+        self.init_interactive()
+
+    def do_SwitchSource_1(self): self.do_SwitchSource(1)
+    def do_SwitchSource_2(self): self.do_SwitchSource(2)
+    def do_SwitchSource_3(self): self.do_SwitchSource(3)
+    def do_SwitchSourceNext(self):
+        self.src_page_idx = (self.src_page_idx + 1 ) % len(self.ac_src_dict) 
+        self.do_SwitchSource(self.src_page_idx)
+
+    def do_SwitchSourcePrevious(self):
+        page = (self.src_page_idx - 1 )
+        if page < 0: page = len(self.ac_src_dict) - 1
+        self.src_page_idx = page
+        self.do_SwitchSource(page)
 
     def do_DeleteBackwordWord(self):
         s = ' '.join(self.current_input.split()[:-1])
         if len(s) != 0: s += ' '
         self.current_input = s
-        self.update_candidate()
-        self.refresh_screen()
+        self.redraw()
 
     def do_Backspace(self):
         self.current_input = self.current_input[:-1]
-        self.update_candidate()
-        self.refresh_screen()
+        self.redraw()
 
     def __line_move(self, direction):
         vim.current.line = ' ' + vim.current.line[1:]
@@ -316,8 +350,4 @@ class Anything(object):
     def do_NextLine(self):     self.__line_move('j')
     def do_PreviousLine(self): self.__line_move('k')
 
-    def do_SelectAction(self):
-        self.source, self.source_b = self.source_b, self.source
-        self.current_input = ""
-        self.update_candidate()
-        self.refresh_screen()
+anything = Anything("anything")

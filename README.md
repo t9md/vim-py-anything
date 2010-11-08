@@ -13,20 +13,24 @@ NOTE: this plugin is very very alpha state.
 Setting example
 ----------------------------------
 # .vimrc
-    nnoremap <D-j> :python anything.start()<CR>
-    vnoremap <D-j> :python anything.start('v')<CR>
-    nnoremap <C-n> :python ac_buffer.start()<CR>
-    vnoremap <C-n> :python ac_buffer.start()<CR>
+
+    nnoremap <D-j> :python anything.start(src=ac_src_cmd, ac_src_dict=ac_src_dict, mode='n')<CR>
+    vnoremap <D-j> :python anything.start(src=ac_src_cmd, ac_src_dict=ac_src_dict, mode='v')<CR>
+
+    nnoremap <D-i> :python anything.start(src=ac_src_command_t)<CR>
+    nnoremap <C-n> :python anything.start(src=ac_src_buffer)<CR>
+    vnoremap <C-n> :python anything.start(src=ac_src_buffer)<CR>
 
 # directly launch command without using anything window.
-    au BufNewFile,BufReadPost about_*.py nnoremap <buffer> <D-r> :python ac_cmd.run(py_koan)<CR>
+
+    au BufNewFile,BufReadPost about_*.py nnoremap <buffer> <D-r> :python anything.run(py_koan)<CR>
 
 anything_source_cmd example
 ----------------------------------
 If you want add the new command to anything_source_cmd.
 See following example.
 
-    @vimpy_command(mode='v')
+    @anything_command(mode='v')
     def this_is_new_cmd(arg1, arg2):
         """This doc string is shown in anytiing window"""
 
@@ -34,8 +38,8 @@ See following example.
         if not header: header = vim.prompt("header? :")
         if not footer: footer = vim.prompt("footer? :")
 
-        " you can use ac_cmd.initial_range to get range"
-        cr = anything.initial_range
+        " you can use anything.range to get visual selected range"
+        cr = anything.range
         new_text = [header] + cr[:] + [footer]
         cr[:] = None
         vim.insert(cr.start,new_text)
@@ -44,7 +48,7 @@ Special Tanks
 ----------------------------------
 
 #### [ Command-t ]( https://github.com/wincent/Command-T )
-User interface and architecture is greately inspired and bollwed from command-t which is also derived from inspired by LustiExplorer.
+User interface and architecture is greately inspired and borrowed from command-t which is also derived from inspiration from by LustiExplorer.
 
 #### [ vimilicious ]( https://github.com/remi/vimilicious )
 
